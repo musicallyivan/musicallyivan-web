@@ -1,0 +1,285 @@
+---
+import { SITE_TITLE } from '../consts';
+
+const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.local';
+---
+
+<header>
+	<nav aria-label="Navegacion principal">
+		<a class="brand" href="/">{SITE_TITLE}</a>
+		<div class="internal-links">
+			<a href="/">Inicio</a>
+			<a href="/youtube">YouTube</a>
+			<a href="/archivo">Archivo</a>
+			<a href="/comunidad">Comunidad</a>
+			<a href="/pedir">Pedir TikTok</a>
+			<a href="/about">About</a>
+			<a href="/admin">Admin</a>
+		</div>
+		<button class="login-trigger" type="button" data-login-open>Login</button>
+	</nav>
+	<div class="login-modal" id="login-modal" aria-hidden="true">
+		<div class="login-card" role="dialog" aria-modal="true" aria-labelledby="login-title">
+			<button class="modal-close" type="button" data-login-close>cerrar</button>
+			<p class="eyebrow">Acceso</p>
+			<h2 id="login-title">Entrar en Musically Ivan</h2>
+			<form id="login-form">
+				<label>
+					Nombre visible
+					<input type="text" name="name" required placeholder="IvanFan" />
+				</label>
+				<label>
+					Correo electronico
+					<input type="email" name="email" required placeholder="ivan@email.com" />
+				</label>
+				<label>
+					Contrasena
+					<input type="password" name="password" minlength="4" required placeholder="Minimo 4 caracteres" />
+				</label>
+				<button type="submit">Entrar o registrarme</button>
+			</form>
+			<button class="twitch-auth" type="button" data-twitch-auth>Continuar con Twitch</button>
+			<p class="login-status" id="login-status" aria-live="polite"></p>
+		</div>
+	</div>
+</header>
+
+<script define:vars={{ adminEmail }}>
+	const loginModal = document.querySelector('#login-modal');
+	const loginForm = document.querySelector('#login-form');
+	const loginStatus = document.querySelector('#login-status');
+	const loginButtons = [...document.querySelectorAll('[data-login-open]')];
+	const closeButtons = [...document.querySelectorAll('[data-login-close]')];
+	const twitchButton = document.querySelector('[data-twitch-auth]');
+
+	const getUser = () => {
+		const raw = localStorage.getItem('musicallyivan:user');
+		if (!raw) return null;
+		try {
+			return JSON.parse(raw);
+		} catch {
+			return { name: raw, email: raw, provider: 'normal' };
+		}
+	};
+
+	const setLoginLabel = () => {
+		const user = getUser();
+		loginButtons.forEach((button) => {
+			button.textContent = user ? user.name || 'Mi cuenta' : 'Login';
+		});
+	};
+
+	loginButtons.forEach((button) => {
+		button.addEventListener('click', () => {
+			loginModal?.setAttribute('aria-hidden', 'false');
+			const user = getUser();
+			if (loginStatus) loginStatus.textContent = user ? `Sesion activa: ${user.name} (${user.provider}).` : '';
+		});
+	});
+
+	closeButtons.forEach((button) => {
+		button.addEventListener('click', () => loginModal?.setAttribute('aria-hidden', 'true'));
+	});
+
+	loginModal?.addEventListener('click', (event) => {
+		if (event.target === loginModal) loginModal.setAttribute('aria-hidden', 'true');
+	});
+
+	loginForm?.addEventListener('submit', (event) => {
+		event.preventDefault();
+		const formData = new FormData(loginForm);
+		const name = String(formData.get('name') ?? '').trim();
+		const email = String(formData.get('email') ?? '');
+		const role = email.toLowerCase() === adminEmail.toLowerCase() ? 'admin' : 'user';
+		localStorage.setItem('musicallyivan:user', JSON.stringify({ name, email, provider: 'normal', role }));
+		if (loginStatus) loginStatus.textContent = `Sesion iniciada como ${name}.`;
+		setLoginLabel();
+	});
+
+	twitchButton?.addEventListener('click', () => {
+		const twitchName = prompt('Usuario de Twitch');
+		if (!twitchName) return;
+		localStorage.setItem(
+			'musicallyivan:user',
+			JSON.stringify({ name: twitchName.trim(), email: '', provider: 'twitch' })
+		);
+		if (loginStatus) loginStatus.textContent = `Sesion iniciada con Twitch como ${twitchName.trim()}.`;
+		setLoginLabel();
+	});
+
+	setLoginLabel();
+</script>
+
+<style>
+	header {
+		position: sticky;
+		top: 0;
+		z-index: 10;
+		border-bottom: 1px solid rgba(24, 24, 27, 0.1);
+		background: rgba(255, 255, 255, 0.94);
+		backdrop-filter: blur(14px);
+	}
+
+	nav {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 20px;
+		width: min(1180px, calc(100% - 32px));
+		min-height: 70px;
+		margin: 0 auto;
+	}
+
+	a {
+		color: #18181b;
+		text-decoration: none;
+	}
+
+	.brand {
+		font-size: 1.1rem;
+		font-weight: 700;
+	}
+
+	.internal-links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px 18px;
+		justify-content: flex-end;
+	}
+
+	.internal-links a,
+	.login-trigger {
+		color: #52525b;
+		font-size: 0.92rem;
+		font-weight: 700;
+	}
+
+	.login-trigger {
+		min-height: 38px;
+		border: 1px solid rgba(24, 24, 27, 0.14);
+		padding: 0 14px;
+		background: #18181b;
+		color: #ffffff;
+		cursor: pointer;
+	}
+
+	.internal-links a:hover,
+	.internal-links a:focus-visible,
+	.login-trigger:hover,
+	.login-trigger:focus-visible {
+		color: #c92754;
+	}
+
+	.login-trigger:hover,
+	.login-trigger:focus-visible {
+		background: #ffffff;
+	}
+
+	.login-modal {
+		position: fixed;
+		inset: 0;
+		z-index: 30;
+		display: grid;
+		place-items: center;
+		padding: 20px;
+		background: rgba(24, 24, 27, 0.55);
+		opacity: 1;
+		transition: opacity 180ms ease;
+	}
+
+	.login-modal[aria-hidden='true'] {
+		pointer-events: none;
+		opacity: 0;
+	}
+
+	.login-card {
+		position: relative;
+		width: min(420px, 100%);
+		border: 1px solid rgba(24, 24, 27, 0.12);
+		padding: 28px;
+		background: #ffffff;
+		box-shadow: 0 30px 80px rgba(24, 24, 27, 0.24);
+		transform: translateY(0);
+		transition: transform 180ms ease;
+	}
+
+	.login-modal[aria-hidden='true'] .login-card {
+		transform: translateY(18px);
+	}
+
+	.login-card h2 {
+		margin: 0 0 18px;
+		font-size: 1.6rem;
+	}
+
+	.login-card form {
+		display: grid;
+		gap: 14px;
+	}
+
+	.login-card label {
+		display: grid;
+		gap: 6px;
+		font-size: 0.9rem;
+		font-weight: 700;
+	}
+
+	.login-card input {
+		box-sizing: border-box;
+		width: 100%;
+		border: 1px solid rgba(24, 24, 27, 0.16);
+		padding: 12px;
+		font: inherit;
+	}
+
+	.login-card button[type='submit'],
+	.twitch-auth,
+	.modal-close {
+		min-height: 42px;
+		border: 0;
+		padding: 0 14px;
+		font: inherit;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.login-card button[type='submit'] {
+		background: #18181b;
+		color: #ffffff;
+	}
+
+	.twitch-auth {
+		width: 100%;
+		margin-top: 12px;
+		background: #9146ff;
+		color: #ffffff;
+	}
+
+	.modal-close {
+		position: absolute;
+		top: 12px;
+		right: 12px;
+		background: #f4f4f5;
+		color: #52525b;
+	}
+
+	.login-status {
+		margin: 14px 0 0;
+		color: #166534;
+		font-size: 0.92rem;
+		font-weight: 700;
+	}
+
+	@media (max-width: 620px) {
+		nav {
+			align-items: flex-start;
+			flex-direction: column;
+			min-height: 0;
+			padding: 14px 0;
+		}
+
+		.internal-links {
+			justify-content: flex-start;
+		}
+	}
+</style>

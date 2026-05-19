@@ -1,0 +1,302 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import { SITE_TITLE } from '../consts';
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<BaseHead title={`Comunidad | ${SITE_TITLE}`} description="Comunidad de Musically Ivan para publicar mensajes anonimos o con cuenta." />
+	</head>
+	<body>
+		<Header />
+		<main class="community-shell">
+			<section class="community-hero">
+				<p class="eyebrow">Comunidad</p>
+				<h1>Publica con cuenta o anonimo</h1>
+				<p>Comparte ideas, recomendaciones de TikTok, comentarios sobre videos o saludos para la comunidad.</p>
+			</section>
+
+			<section class="composer">
+				<div>
+					<h2>Nueva publicacion</h2>
+					<p id="account-status" aria-live="polite">Puedes publicar como anonimo o iniciar sesion.</p>
+				</div>
+				<form id="community-form">
+					<label>
+						Mensaje
+						<textarea name="message" rows="5" maxlength="360" required placeholder="Escribe algo para la comunidad..."></textarea>
+					</label>
+					<div class="form-row">
+						<label class="check-option">
+							<input type="checkbox" name="anonymous" checked />
+							Publicar anonimamente
+						</label>
+						<button type="button" data-login-open>Usar cuenta</button>
+						<button type="submit">Publicar</button>
+					</div>
+					<p id="community-status" aria-live="polite"></p>
+				</form>
+			</section>
+
+			<section class="feed-section" aria-labelledby="feed-title">
+				<div class="feed-heading">
+					<p class="eyebrow">Muro</p>
+					<h2 id="feed-title">Publicaciones recientes</h2>
+				</div>
+				<div class="community-feed" id="community-feed"></div>
+			</section>
+		</main>
+		<Footer />
+		<script>
+			const form = document.querySelector('#community-form');
+			const feed = document.querySelector('#community-feed');
+			const status = document.querySelector('#community-status');
+			const accountStatus = document.querySelector('#account-status');
+			const defaultPosts = [
+				{
+					id: 'seed-1',
+					author: 'Musically Ivan',
+					provider: 'normal',
+					message: 'Bienvenidos a la comunidad. Aqui podreis proponer TikToks, ideas y comentar los nuevos videos.',
+					createdAt: new Date().toISOString(),
+				},
+				{
+					id: 'seed-2',
+					author: 'Anonimo',
+					provider: 'anon',
+					message: 'Estaria bien una seccion para votar el proximo TikTok.',
+					createdAt: new Date(Date.now() - 86400000).toISOString(),
+				},
+			];
+
+			const getUser = () => {
+				const raw = localStorage.getItem('musicallyivan:user');
+				if (!raw) return null;
+				try {
+					return JSON.parse(raw);
+				} catch {
+					return { name: raw, provider: 'normal' };
+				}
+			};
+
+			const getPosts = () => {
+				const saved = JSON.parse(localStorage.getItem('musicallyivan:community') ?? '[]');
+				return [...saved, ...defaultPosts];
+			};
+
+			const savePost = (post) => {
+				const saved = JSON.parse(localStorage.getItem('musicallyivan:community') ?? '[]');
+				saved.unshift(post);
+				localStorage.setItem('musicallyivan:community', JSON.stringify(saved.slice(0, 50)));
+			};
+
+			const formatDate = (date) =>
+				new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(
+					new Date(date)
+				);
+			const escapeHtml = (value) =>
+				String(value)
+					.replaceAll('&', '&amp;')
+					.replaceAll('<', '&lt;')
+					.replaceAll('>', '&gt;')
+					.replaceAll('"', '&quot;')
+					.replaceAll("'", '&#039;');
+
+			const updateAccountStatus = () => {
+				const user = getUser();
+				if (accountStatus) {
+					accountStatus.textContent = user
+						? `Sesion activa: ${user.name} (${user.provider}). Puedes desmarcar anonimo para publicar con cuenta.`
+						: 'Puedes publicar como anonimo o iniciar sesion.';
+				}
+			};
+
+			const renderPosts = () => {
+				if (!feed) return;
+				feed.innerHTML = getPosts()
+					.map(
+						(post) => `
+							<article class="community-post">
+								<div>
+									<strong>${escapeHtml(post.author)}</strong>
+									<span>${post.provider === 'twitch' ? 'Twitch' : post.provider === 'anon' ? 'Anonimo' : 'Cuenta'}</span>
+								</div>
+								<p>${escapeHtml(post.message)}</p>
+								<time datetime="${post.createdAt}">${formatDate(post.createdAt)}</time>
+							</article>
+						`
+					)
+					.join('');
+			};
+
+			form?.addEventListener('submit', (event) => {
+				event.preventDefault();
+				const data = new FormData(form);
+				const anonymous = data.get('anonymous') === 'on';
+				const user = getUser();
+				if (!anonymous && !user) {
+					status.textContent = 'Inicia sesion o marca publicar anonimamente.';
+					document.querySelector('[data-login-open]')?.click();
+					return;
+				}
+				const message = String(data.get('message') ?? '').trim();
+				if (!message) return;
+				savePost({
+					id: crypto.randomUUID(),
+					author: anonymous ? 'Anonimo' : user.name,
+					provider: anonymous ? 'anon' : user.provider,
+					message,
+					createdAt: new Date().toISOString(),
+				});
+				form.reset();
+				form.querySelector('[name="anonymous"]').checked = true;
+				status.textContent = 'Publicacion enviada.';
+				renderPosts();
+			});
+
+			window.addEventListener('storage', updateAccountStatus);
+			updateAccountStatus();
+			renderPosts();
+		</script>
+	</body>
+</html>
+
+<style>
+	.community-shell {
+		width: min(980px, calc(100% - 32px));
+		margin: 0 auto;
+		padding: 44px 0 70px;
+	}
+
+	.community-hero,
+	.composer,
+	.feed-heading,
+	.community-post {
+		border: 1px solid rgba(24, 24, 27, 0.1);
+		background: #ffffff;
+	}
+
+	.community-hero,
+	.composer,
+	.feed-heading {
+		padding: 28px;
+	}
+
+	.eyebrow {
+		margin: 0 0 10px;
+		color: #c92754;
+		font-size: 0.78rem;
+		font-weight: 700;
+		text-transform: uppercase;
+	}
+
+	h1 {
+		margin: 0;
+		font-size: clamp(3rem, 8vw, 5.6rem);
+		line-height: 0.95;
+	}
+
+	.community-hero > p,
+	.composer p {
+		max-width: 700px;
+		margin: 16px 0 0;
+		color: #52525b;
+	}
+
+	.composer,
+	.feed-section {
+		margin-top: 20px;
+	}
+
+	h2 {
+		margin: 0;
+		font-size: 1.45rem;
+	}
+
+	form {
+		display: grid;
+		gap: 14px;
+		margin-top: 20px;
+	}
+
+	label {
+		display: grid;
+		gap: 8px;
+		font-weight: 700;
+	}
+
+	textarea {
+		box-sizing: border-box;
+		width: 100%;
+		border: 1px solid rgba(24, 24, 27, 0.16);
+		padding: 12px;
+		font: inherit;
+	}
+
+	.form-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 12px;
+		align-items: center;
+	}
+
+	.check-option {
+		display: inline-flex;
+		flex: 1 1 220px;
+		gap: 8px;
+		align-items: center;
+	}
+
+	button {
+		min-height: 42px;
+		border: 0;
+		padding: 0 14px;
+		background: #18181b;
+		color: #ffffff;
+		font: inherit;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	button[type='submit'] {
+		background: #c92754;
+	}
+
+	#community-status {
+		margin: 0;
+		color: #166534;
+		font-weight: 700;
+	}
+
+	.community-feed {
+		display: grid;
+		gap: 14px;
+		margin-top: 14px;
+	}
+
+	.community-post {
+		padding: 20px;
+	}
+
+	.community-post div {
+		display: flex;
+		justify-content: space-between;
+		gap: 12px;
+	}
+
+	.community-post span,
+	.community-post time {
+		color: #71717a;
+		font-size: 0.86rem;
+		font-weight: 700;
+	}
+
+	.community-post p {
+		margin: 14px 0;
+		color: #27272a;
+		line-height: 1.65;
+	}
+</style>

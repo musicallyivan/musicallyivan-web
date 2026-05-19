@@ -1,0 +1,49 @@
+---
+const today = new Date();
+---
+
+<footer>
+	<div>
+		<strong>Musically Ivan</strong>
+		<span>&copy; {today.getFullYear()} Archivo adaptado a Astro.</span>
+	</div>
+	<a href="https://musicallyivan.blogspot.com/" target="_blank" rel="noreferrer">Referencia original</a>
+</footer>
+
+<style>
+	footer {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 18px;
+		width: min(1180px, calc(100% - 32px));
+		margin: 0 auto;
+		padding: 30px 0 54px;
+		border-top: 1px solid rgba(24, 24, 27, 0.1);
+		color: #52525b;
+		font-size: 0.95rem;
+	}
+
+	div {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px 14px;
+	}
+
+	strong {
+		color: #18181b;
+	}
+
+	a {
+		color: #c92754;
+		font-weight: 700;
+		text-decoration: none;
+	}
+
+	@media (max-width: 620px) {
+		footer {
+			align-items: flex-start;
+			flex-direction: column;
+		}
+	}
+</style>

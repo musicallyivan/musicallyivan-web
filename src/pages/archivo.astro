@@ -1,0 +1,206 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import { SITE_TITLE } from '../consts';
+import { archive, posts, tags } from '../lib/siteData';
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<BaseHead title={`Archivo | ${SITE_TITLE}`} description="Archivo de entradas y etiquetas de Musically Ivan." />
+	</head>
+	<body>
+		<Header />
+		<main class="archive-shell">
+			<section class="archive-hero">
+				<p class="eyebrow">Archivo</p>
+				<h1>Entradas y etiquetas</h1>
+				<input id="archive-search" type="search" placeholder="Buscar por titulo, fecha o etiqueta..." />
+				<p id="archive-status" aria-live="polite">Mostrando todo el archivo.</p>
+			</section>
+			<section class="archive-grid">
+				<div class="post-list">
+					{posts.map((post, index) => (
+						<article class="post-card searchable" data-search={`${post.title} ${post.date} ${post.category}`}>
+							<span>{String(index + 1).padStart(2, '0')}</span>
+							<div>
+								<p>{post.date} / {post.category}</p>
+								<h2>{post.title}</h2>
+							</div>
+						</article>
+					))}
+				</div>
+				<aside>
+					<section>
+						<h2>Meses</h2>
+						<ul>
+							{archive.map(([month, count]) => (
+								<li>
+									<a href="#">{month}</a>
+									<span>{count}</span>
+								</li>
+							))}
+						</ul>
+					</section>
+					<section>
+						<h2>Etiquetas</h2>
+						<div class="tag-list">
+							{tags.map((tag) => <a class="searchable" href="#" data-search={tag}>{tag}</a>)}
+						</div>
+					</section>
+				</aside>
+			</section>
+		</main>
+		<Footer />
+		<script>
+			const input = document.querySelector('#archive-search');
+			const status = document.querySelector('#archive-status');
+			const items = [...document.querySelectorAll('.searchable')];
+
+			input?.addEventListener('input', () => {
+				const query = input.value.trim().toLowerCase();
+				let visible = 0;
+				items.forEach((item) => {
+					const match = !query || (item.getAttribute('data-search') ?? '').toLowerCase().includes(query);
+					item.toggleAttribute('hidden', !match);
+					if (match) visible += 1;
+				});
+				if (status) status.textContent = query ? `${visible} resultado${visible === 1 ? '' : 's'}.` : 'Mostrando todo el archivo.';
+			});
+		</script>
+	</body>
+</html>
+
+<style>
+	.archive-shell {
+		width: min(1180px, calc(100% - 32px));
+		margin: 0 auto;
+		padding: 40px 0 70px;
+	}
+
+	.archive-hero,
+	.post-card,
+	aside section {
+		border: 1px solid rgba(24, 24, 27, 0.1);
+		background: #ffffff;
+	}
+
+	.archive-hero {
+		padding: 32px;
+	}
+
+	.eyebrow,
+	.post-card p {
+		margin: 0 0 10px;
+		color: #c92754;
+		font-size: 0.78rem;
+		font-weight: 700;
+		text-transform: uppercase;
+	}
+
+	h1 {
+		margin: 0 0 22px;
+		font-size: clamp(3rem, 8vw, 6rem);
+		line-height: 0.95;
+	}
+
+	input {
+		box-sizing: border-box;
+		width: min(560px, 100%);
+		min-height: 52px;
+		border: 1px solid rgba(201, 39, 84, 0.35);
+		padding: 0 16px;
+		font: inherit;
+	}
+
+	#archive-status {
+		margin: 12px 0 0;
+		color: #71717a;
+		font-size: 0.92rem;
+	}
+
+	.archive-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 330px;
+		gap: 24px;
+		margin-top: 24px;
+	}
+
+	.post-list,
+	aside {
+		display: grid;
+		gap: 16px;
+	}
+
+	.post-card {
+		display: grid;
+		grid-template-columns: 72px minmax(0, 1fr);
+		gap: 18px;
+		padding: 18px;
+	}
+
+	.post-card span {
+		display: grid;
+		place-items: center;
+		aspect-ratio: 1;
+		background: #18181b;
+		color: #ffffff;
+		font-weight: 700;
+	}
+
+	.post-card h2,
+	aside h2 {
+		margin: 0;
+		font-size: 1.25rem;
+	}
+
+	aside section {
+		padding: 22px;
+	}
+
+	ul {
+		display: grid;
+		gap: 10px;
+		padding: 0;
+		margin: 18px 0 0;
+		list-style: none;
+	}
+
+	li {
+		display: flex;
+		justify-content: space-between;
+		gap: 16px;
+	}
+
+	a {
+		color: #27272a;
+		text-decoration: none;
+	}
+
+	.tag-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-top: 18px;
+	}
+
+	.tag-list a {
+		padding: 7px 10px;
+		border: 1px solid rgba(24, 24, 27, 0.12);
+		background: #fafafa;
+		font-size: 0.86rem;
+		font-weight: 700;
+	}
+
+	[hidden] {
+		display: none !important;
+	}
+
+	@media (max-width: 860px) {
+		.archive-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

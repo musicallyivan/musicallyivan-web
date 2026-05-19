@@ -1,0 +1,321 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import { SITE_TITLE } from '../consts';
+
+const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.local';
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<BaseHead title={`Admin | ${SITE_TITLE}`} description="Panel de administracion de Musically Ivan." />
+	</head>
+	<body>
+		<Header />
+		<main class="admin-shell">
+			<section class="admin-hero">
+				<p class="eyebrow">Admin</p>
+				<h1>Gestion de comunidad</h1>
+				<p id="admin-status">Inicia sesion con el correo admin para gestionar la web.</p>
+			</section>
+
+			<section class="locked-panel" id="locked-panel">
+				<h2>Acceso requerido</h2>
+				<p>El email admin configurado para esta version local es <strong>{adminEmail}</strong>.</p>
+				<button type="button" data-login-open>Entrar como admin</button>
+			</section>
+
+			<section class="admin-grid" id="admin-panel" hidden>
+				<div class="admin-card">
+					<div class="card-heading">
+						<h2>Peticiones de TikTok</h2>
+						<button type="button" id="clear-done">Limpiar hechas</button>
+					</div>
+					<div class="admin-list" id="requests-list"></div>
+				</div>
+
+				<div class="admin-card">
+					<div class="card-heading">
+						<h2>Comunidad</h2>
+						<button type="button" id="clear-community">Limpiar comunidad local</button>
+					</div>
+					<div class="admin-list" id="community-list"></div>
+				</div>
+			</section>
+		</main>
+		<Footer />
+		<script define:vars={{ adminEmail }}>
+			const adminPanel = document.querySelector('#admin-panel');
+			const lockedPanel = document.querySelector('#locked-panel');
+			const adminStatus = document.querySelector('#admin-status');
+			const requestsList = document.querySelector('#requests-list');
+			const communityList = document.querySelector('#community-list');
+			const clearDone = document.querySelector('#clear-done');
+			const clearCommunity = document.querySelector('#clear-community');
+
+			const readJson = (key, fallback = []) => {
+				try {
+					return JSON.parse(localStorage.getItem(key) ?? JSON.stringify(fallback));
+				} catch {
+					return fallback;
+				}
+			};
+
+			const getUser = () => {
+				const raw = localStorage.getItem('musicallyivan:user');
+				if (!raw) return null;
+				try {
+					return JSON.parse(raw);
+				} catch {
+					return null;
+				}
+			};
+
+			const isAdmin = () => {
+				const user = getUser();
+				return user?.role === 'admin' || user?.email?.toLowerCase() === adminEmail.toLowerCase();
+			};
+
+			const formatDate = (date) =>
+				date
+					? new Intl.DateTimeFormat('es-ES', {
+							day: '2-digit',
+							month: 'short',
+							year: 'numeric',
+							hour: '2-digit',
+							minute: '2-digit',
+						}).format(new Date(date))
+					: 'Sin fecha';
+
+			const createText = (tag, text, className) => {
+				const element = document.createElement(tag);
+				element.textContent = text;
+				if (className) element.className = className;
+				return element;
+			};
+
+			const renderRequests = () => {
+				const requests = readJson('musicallyivan:requests');
+				requestsList.innerHTML = '';
+				if (requests.length === 0) {
+					requestsList.append(createText('p', 'Todavia no hay peticiones guardadas en este navegador.', 'empty'));
+					return;
+				}
+
+				requests.forEach((request, index) => {
+					const item = document.createElement('article');
+					item.className = request.done ? 'admin-item is-done' : 'admin-item';
+
+					const top = document.createElement('div');
+					top.className = 'item-top';
+					const checkboxLabel = document.createElement('label');
+					const checkbox = document.createElement('input');
+					checkbox.type = 'checkbox';
+					checkbox.checked = Boolean(request.done);
+					checkbox.addEventListener('change', () => {
+						const nextRequests = readJson('musicallyivan:requests');
+						nextRequests[index] = { ...nextRequests[index], done: checkbox.checked };
+						localStorage.setItem('musicallyivan:requests', JSON.stringify(nextRequests));
+						renderRequests();
+					});
+					checkboxLabel.append(checkbox, document.createTextNode(' Hecho'));
+					top.append(createText('strong', request.name || 'Sin nombre'), checkboxLabel);
+
+					const email = request.email ? `Email: ${request.email}` : 'Sin email';
+					item.append(
+						top,
+						createText('p', request.message || 'Sin mensaje'),
+						createText('span', email),
+						createText('time', formatDate(request.createdAt))
+					);
+					requestsList.append(item);
+				});
+			};
+
+			const renderCommunity = () => {
+				const posts = readJson('musicallyivan:community');
+				communityList.innerHTML = '';
+				if (posts.length === 0) {
+					communityList.append(createText('p', 'No hay publicaciones locales de la comunidad.', 'empty'));
+					return;
+				}
+
+				posts.forEach((post, index) => {
+					const item = document.createElement('article');
+					item.className = 'admin-item';
+					const top = document.createElement('div');
+					top.className = 'item-top';
+					const deleteButton = document.createElement('button');
+					deleteButton.type = 'button';
+					deleteButton.textContent = 'Eliminar';
+					deleteButton.addEventListener('click', () => {
+						const nextPosts = readJson('musicallyivan:community');
+						nextPosts.splice(index, 1);
+						localStorage.setItem('musicallyivan:community', JSON.stringify(nextPosts));
+						renderCommunity();
+					});
+					top.append(createText('strong', post.author || 'Anonimo'), deleteButton);
+					item.append(
+						top,
+						createText('p', post.message || ''),
+						createText('span', `Origen: ${post.provider || 'normal'}`),
+						createText('time', formatDate(post.createdAt))
+					);
+					communityList.append(item);
+				});
+			};
+
+			const renderAdmin = () => {
+				if (!isAdmin()) {
+					adminPanel.hidden = true;
+					lockedPanel.hidden = false;
+					adminStatus.textContent = 'Inicia sesion con el correo admin para gestionar la web.';
+					return;
+				}
+
+				adminPanel.hidden = false;
+				lockedPanel.hidden = true;
+				adminStatus.textContent = 'Perfil admin activo. Estos datos son locales hasta conectar backend.';
+				renderRequests();
+				renderCommunity();
+			};
+
+			clearDone?.addEventListener('click', () => {
+				const pending = readJson('musicallyivan:requests').filter((request) => !request.done);
+				localStorage.setItem('musicallyivan:requests', JSON.stringify(pending));
+				renderRequests();
+			});
+
+			clearCommunity?.addEventListener('click', () => {
+				localStorage.removeItem('musicallyivan:community');
+				renderCommunity();
+			});
+
+			window.addEventListener('storage', renderAdmin);
+			document.addEventListener('visibilitychange', renderAdmin);
+			renderAdmin();
+		</script>
+	</body>
+</html>
+
+<style>
+	.admin-shell {
+		width: min(1180px, calc(100% - 32px));
+		margin: 0 auto;
+		padding: 44px 0 70px;
+	}
+
+	.admin-hero,
+	.locked-panel,
+	.admin-card {
+		border: 1px solid rgba(24, 24, 27, 0.1);
+		background: #ffffff;
+	}
+
+	.admin-hero,
+	.locked-panel,
+	.admin-card {
+		padding: 28px;
+	}
+
+	.eyebrow {
+		margin: 0 0 10px;
+		color: #c92754;
+		font-size: 0.78rem;
+		font-weight: 700;
+		text-transform: uppercase;
+	}
+
+	h1 {
+		margin: 0;
+		font-size: clamp(3rem, 8vw, 5.6rem);
+		line-height: 0.95;
+	}
+
+	.admin-hero p,
+	.locked-panel p {
+		margin: 16px 0 0;
+		color: #52525b;
+	}
+
+	.locked-panel,
+	.admin-grid {
+		margin-top: 20px;
+	}
+
+	.admin-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 20px;
+	}
+
+	.card-heading,
+	.item-top {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 14px;
+	}
+
+	h2 {
+		margin: 0;
+		font-size: 1.35rem;
+	}
+
+	button {
+		min-height: 38px;
+		border: 0;
+		padding: 0 12px;
+		background: #18181b;
+		color: #ffffff;
+		font: inherit;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.admin-list {
+		display: grid;
+		gap: 12px;
+		margin-top: 18px;
+	}
+
+	.admin-item {
+		border: 1px solid rgba(24, 24, 27, 0.1);
+		padding: 16px;
+		background: #fafafa;
+	}
+
+	.admin-item.is-done {
+		opacity: 0.68;
+	}
+
+	.admin-item p {
+		margin: 12px 0;
+		color: #27272a;
+		line-height: 1.55;
+	}
+
+	.admin-item span,
+	.admin-item time,
+	.empty {
+		color: #71717a;
+		font-size: 0.9rem;
+		font-weight: 700;
+	}
+
+	label {
+		font-weight: 700;
+	}
+
+	[hidden] {
+		display: none !important;
+	}
+
+	@media (max-width: 860px) {
+		.admin-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

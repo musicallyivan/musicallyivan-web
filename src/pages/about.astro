@@ -1,0 +1,150 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import { SITE_TITLE } from '../consts';
+import { fetchYoutubeChannel } from '../lib/youtube';
+
+const channel = await fetchYoutubeChannel();
+const description = channel.description || 'Canal de Musically Ivan en YouTube.';
+const paragraphs = description.split(/\n{2,}/).filter(Boolean);
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<BaseHead title={`About | ${SITE_TITLE}`} description={description} />
+	</head>
+	<body>
+		<Header />
+		<main class="about-shell">
+			{channel.bannerUrl && <div class="channel-banner" style={`background-image: url('${channel.bannerUrl}')`} aria-label="Banner del canal de YouTube"></div>}
+			<section class="about-hero">
+				<div>
+					<p class="eyebrow">About del canal</p>
+					<h1>{channel.title}</h1>
+					<div class="about-copy">
+						{paragraphs.map((paragraph) => <p>{paragraph}</p>)}
+					</div>
+					<a href={channel.url} target="_blank" rel="noreferrer">Abrir canal de YouTube</a>
+				</div>
+				{channel.thumbnail && <img src={channel.thumbnail} alt={channel.title} />}
+			</section>
+			<section class="stats">
+				<div>
+					<span>{channel.videoCount ?? '0'}</span>
+					<p>Videos publicados</p>
+				</div>
+				<div>
+					<span>{channel.subscriberCount ?? '-'}</span>
+					<p>Suscriptores</p>
+				</div>
+			</section>
+		</main>
+		<Footer />
+	</body>
+</html>
+
+<style>
+	.about-shell {
+		width: min(980px, calc(100% - 32px));
+		margin: 0 auto;
+		padding: 44px 0 70px;
+	}
+
+	.about-hero {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 220px;
+		gap: 32px;
+		align-items: start;
+		border: 1px solid rgba(24, 24, 27, 0.1);
+		padding: 32px;
+		background: #ffffff;
+	}
+
+	.channel-banner {
+		min-height: 240px;
+		margin-bottom: 16px;
+		border: 1px solid rgba(24, 24, 27, 0.1);
+		background-position: center;
+		background-size: cover;
+	}
+
+	.eyebrow {
+		margin: 0 0 10px;
+		color: #c92754;
+		font-size: 0.78rem;
+		font-weight: 700;
+		text-transform: uppercase;
+	}
+
+	h1 {
+		margin: 0 0 22px;
+		font-size: clamp(2.6rem, 7vw, 5rem);
+		line-height: 0.95;
+	}
+
+	.about-copy {
+		display: grid;
+		gap: 16px;
+	}
+
+	.about-copy p {
+		margin: 0;
+		color: #3f3f46;
+		font-size: 1.05rem;
+		line-height: 1.75;
+		white-space: pre-line;
+	}
+
+	a {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
+		margin-top: 28px;
+		padding: 0 16px;
+		background: #18181b;
+		color: #ffffff;
+		font-weight: 700;
+		text-decoration: none;
+	}
+
+	img {
+		width: 100%;
+		aspect-ratio: 1;
+		object-fit: cover;
+		border: 1px solid rgba(24, 24, 27, 0.1);
+	}
+
+	.stats {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 16px;
+		margin-top: 16px;
+	}
+
+	.stats div {
+		border: 1px solid rgba(24, 24, 27, 0.1);
+		padding: 22px;
+		background: #ffffff;
+	}
+
+	.stats span {
+		color: #c92754;
+		font-size: 2rem;
+		font-weight: 700;
+	}
+
+	.stats p {
+		margin: 4px 0 0;
+		color: #52525b;
+		font-weight: 700;
+	}
+
+	@media (max-width: 720px) {
+		.about-hero,
+		.stats {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>
