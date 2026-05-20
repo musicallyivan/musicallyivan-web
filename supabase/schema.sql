@@ -1,6 +1,11 @@
 create table if not exists public.profiles (
 	id uuid primary key references auth.users(id) on delete cascade,
 	display_name text not null,
+	bio text,
+	avatar_url text,
+	tiktok_url text,
+	twitch_url text,
+	youtube_url text,
 	role text not null default 'user' check (role in ('user', 'admin')),
 	provider text not null default 'email',
 	created_at timestamptz not null default now()

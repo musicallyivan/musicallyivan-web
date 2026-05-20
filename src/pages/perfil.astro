@@ -1,0 +1,217 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import { SITE_TITLE } from '../consts';
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<BaseHead title={`Perfil | ${SITE_TITLE}`} description="Personaliza tu perfil de Musically Ivan." />
+	</head>
+	<body>
+		<Header />
+		<main class="profile-shell">
+			<section class="profile-card">
+				<p class="eyebrow">Perfil</p>
+				<h1>Personaliza tu cuenta</h1>
+				<p id="profile-session">Inicia sesion para editar tu perfil.</p>
+
+				<form id="profile-form" hidden>
+					<label>
+						Nombre visible
+						<input type="text" name="display_name" required />
+					</label>
+					<label>
+						Avatar URL
+						<input type="url" name="avatar_url" placeholder="https://..." />
+					</label>
+					<label>
+						Bio
+						<textarea name="bio" rows="5" maxlength="300"></textarea>
+					</label>
+					<div class="link-grid">
+						<label>
+							TikTok
+							<input type="url" name="tiktok_url" placeholder="https://tiktok.com/@..." />
+						</label>
+						<label>
+							Twitch
+							<input type="url" name="twitch_url" placeholder="https://twitch.tv/..." />
+						</label>
+						<label>
+							YouTube
+							<input type="url" name="youtube_url" placeholder="https://youtube.com/..." />
+						</label>
+					</div>
+					<button type="submit">Guardar perfil</button>
+					<p id="profile-status" aria-live="polite"></p>
+				</form>
+			</section>
+		</main>
+		<Footer />
+		<script>
+			import { supabase } from '../lib/supabaseClient';
+
+			const form = document.querySelector('#profile-form');
+			const sessionText = document.querySelector('#profile-session');
+			const status = document.querySelector('#profile-status');
+
+			const readUser = () => {
+				const raw = localStorage.getItem('musicallyivan:user');
+				if (!raw) return null;
+				try {
+					return JSON.parse(raw);
+				} catch {
+					return null;
+				}
+			};
+
+			const fillForm = (profile) => {
+				form.display_name.value = profile.display_name ?? profile.name ?? '';
+				form.avatar_url.value = profile.avatar_url ?? '';
+				form.bio.value = profile.bio ?? '';
+				form.tiktok_url.value = profile.tiktok_url ?? '';
+				form.twitch_url.value = profile.twitch_url ?? '';
+				form.youtube_url.value = profile.youtube_url ?? '';
+			};
+
+			const loadProfile = async () => {
+				const localUser = readUser();
+				if (!localUser) {
+					form.hidden = true;
+					sessionText.textContent = 'Inicia sesion para editar tu perfil.';
+					return;
+				}
+
+				form.hidden = false;
+				sessionText.textContent = `Editando perfil como ${localUser.name}.`;
+				const localProfile = JSON.parse(localStorage.getItem('musicallyivan:profile') ?? '{}');
+				fillForm({ ...localProfile, display_name: localUser.name });
+
+				if (!supabase || !localUser.id) return;
+				const { data, error } = await supabase.from('profiles').select('*').eq('id', localUser.id).single();
+				if (!error && data) fillForm(data);
+			};
+
+			form?.addEventListener('submit', async (event) => {
+				event.preventDefault();
+				const localUser = readUser();
+				if (!localUser) return;
+
+				const payload = Object.fromEntries(new FormData(form));
+				localStorage.setItem('musicallyivan:profile', JSON.stringify(payload));
+				localStorage.setItem('musicallyivan:user', JSON.stringify({ ...localUser, name: payload.display_name }));
+
+				let savedRemote = false;
+				if (supabase && localUser.id) {
+					const { error } = await supabase.from('profiles').upsert({
+						id: localUser.id,
+						display_name: payload.display_name,
+						bio: payload.bio,
+						avatar_url: payload.avatar_url,
+						tiktok_url: payload.tiktok_url,
+						twitch_url: payload.twitch_url,
+						youtube_url: payload.youtube_url,
+						provider: localUser.provider ?? 'email',
+						role: localUser.role ?? 'user',
+					});
+					savedRemote = !error;
+				}
+
+				if (status) status.textContent = savedRemote ? 'Perfil guardado.' : 'Perfil guardado en local.';
+			});
+
+			await loadProfile();
+		</script>
+	</body>
+</html>
+
+<style>
+	.profile-shell {
+		width: min(820px, calc(100% - 32px));
+		margin: 0 auto;
+		padding: 44px 0 70px;
+	}
+
+	.profile-card {
+		border: 1px solid rgba(24, 24, 27, 0.1);
+		padding: 32px;
+		background: #ffffff;
+	}
+
+	.eyebrow {
+		margin: 0 0 10px;
+		color: #c92754;
+		font-size: 0.78rem;
+		font-weight: 700;
+		text-transform: uppercase;
+	}
+
+	h1 {
+		margin: 0;
+		font-size: clamp(3rem, 8vw, 5rem);
+		line-height: 0.95;
+	}
+
+	#profile-session {
+		margin: 18px 0 0;
+		color: #52525b;
+		font-weight: 700;
+	}
+
+	form {
+		display: grid;
+		gap: 16px;
+		margin-top: 26px;
+	}
+
+	label {
+		display: grid;
+		gap: 8px;
+		color: #3f3f46;
+		font-weight: 700;
+	}
+
+	.link-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 14px;
+	}
+
+	input,
+	textarea {
+		box-sizing: border-box;
+		width: 100%;
+		border: 1px solid rgba(24, 24, 27, 0.16);
+		padding: 12px;
+		font: inherit;
+	}
+
+	button {
+		min-height: 46px;
+		border: 0;
+		background: #c92754;
+		color: #ffffff;
+		font: inherit;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	#profile-status {
+		margin: 0;
+		color: #166534;
+		font-weight: 700;
+	}
+
+	[hidden] {
+		display: none !important;
+	}
+
+	@media (max-width: 720px) {
+		.link-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

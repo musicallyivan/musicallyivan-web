@@ -2,11 +2,13 @@
 
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
+import vercel from '@astrojs/vercel';
 import { defineConfig, fontProviders } from 'astro/config';
 
 // https://astro.build/config
 export default defineConfig({
 	site: process.env.PUBLIC_SITE_URL ?? 'https://musicallyivan-web.vercel.app',
+	adapter: vercel(),
 	integrations: [mdx(), sitemap()],
 	fonts: [
 		{

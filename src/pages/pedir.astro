@@ -63,8 +63,19 @@ import { SITE_TITLE } from '../consts';
 					localStorage.setItem('musicallyivan:requests', JSON.stringify(requests.slice(0, 20)));
 				}
 
+				const emailResponse = await fetch('/api/send-request-email', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(data),
+				}).catch(() => null);
+				const emailResult = emailResponse ? await emailResponse.json().catch(() => null) : null;
+
 				requestForm.reset();
-				if (formStatus) formStatus.textContent = savedRemotely ? 'Peticion enviada.' : 'Peticion guardada en local.';
+				if (formStatus) {
+					const storageText = savedRemotely ? 'Peticion guardada.' : 'Peticion guardada en local.';
+					const emailText = emailResult?.skipped ? ' Email pendiente de configurar.' : emailResponse?.ok ? ' Email enviado.' : ' Email no enviado.';
+					formStatus.textContent = `${storageText}${emailText}`;
+				}
 			});
 		</script>
 	</body>

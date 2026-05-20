@@ -16,7 +16,11 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 			<a href="/about">About</a>
 			<a href="/admin">Admin</a>
 		</div>
-		<button class="login-trigger" type="button" data-login-open>Login</button>
+		<div class="account-actions">
+			<button class="login-trigger" type="button" data-login-open>Login</button>
+			<a class="profile-link" href="/perfil" data-profile-link hidden>Perfil</a>
+			<button class="logout-trigger" type="button" data-logout hidden>Cerrar sesion</button>
+		</div>
 	</nav>
 	<div class="login-modal" id="login-modal" aria-hidden="true">
 		<div class="login-card" role="dialog" aria-modal="true" aria-labelledby="login-title">
@@ -54,6 +58,8 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 	const loginButtons = [...document.querySelectorAll('[data-login-open]')];
 	const closeButtons = [...document.querySelectorAll('[data-login-close]')];
 	const twitchButton = document.querySelector('[data-twitch-auth]');
+	const profileLink = document.querySelector('[data-profile-link]');
+	const logoutButton = document.querySelector('[data-logout]');
 
 	const getUser = () => {
 		const raw = localStorage.getItem('musicallyivan:user');
@@ -70,6 +76,8 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 		loginButtons.forEach((button) => {
 			button.textContent = user ? user.name || 'Mi cuenta' : 'Login';
 		});
+		if (profileLink) profileLink.hidden = !user;
+		if (logoutButton) logoutButton.hidden = !user;
 	};
 
 	const syncSupabaseUser = async () => {
@@ -172,6 +180,13 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 		if (error && loginStatus) loginStatus.textContent = error.message;
 	});
 
+	logoutButton?.addEventListener('click', async () => {
+		if (supabase) await supabase.auth.signOut();
+		localStorage.removeItem('musicallyivan:user');
+		setLoginLabel();
+		if (loginStatus) loginStatus.textContent = 'Sesion cerrada.';
+	});
+
 	await syncSupabaseUser();
 </script>
 
@@ -195,6 +210,13 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 		margin: 0 auto;
 	}
 
+	.account-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		justify-content: flex-end;
+	}
+
 	a {
 		color: #18181b;
 		text-decoration: none;
@@ -213,13 +235,20 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 	}
 
 	.internal-links a,
-	.login-trigger {
+	.login-trigger,
+	.logout-trigger,
+	.profile-link {
 		color: #52525b;
 		font-size: 0.92rem;
 		font-weight: 700;
 	}
 
-	.login-trigger {
+	.login-trigger,
+	.logout-trigger,
+	.profile-link {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 		min-height: 38px;
 		border: 1px solid rgba(24, 24, 27, 0.14);
 		padding: 0 14px;
@@ -228,10 +257,23 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 		cursor: pointer;
 	}
 
+	.profile-link {
+		background: #c92754;
+	}
+
+	.logout-trigger {
+		background: #ffffff;
+		color: #18181b;
+	}
+
 	.internal-links a:hover,
 	.internal-links a:focus-visible,
 	.login-trigger:hover,
-	.login-trigger:focus-visible {
+	.login-trigger:focus-visible,
+	.logout-trigger:hover,
+	.logout-trigger:focus-visible,
+	.profile-link:hover,
+	.profile-link:focus-visible {
 		color: #c92754;
 	}
 
@@ -344,6 +386,10 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 		}
 
 		.internal-links {
+			justify-content: flex-start;
+		}
+
+		.account-actions {
 			justify-content: flex-start;
 		}
 	}

@@ -25,9 +25,14 @@ YOUTUBE_API_KEY=
 PUBLIC_SITE_URL=https://musicallyivan-web.vercel.app
 YOUTUBE_CHANNEL_ID=
 PUBLIC_ADMIN_EMAIL=admin@musicallyivan.local
+RESEND_API_KEY=
+REQUEST_EMAIL_TO=
+REQUEST_EMAIL_FROM=Musically Ivan <onboarding@resend.dev>
 ```
 
 En Vercel hay que añadir esas mismas variables en Project Settings > Environment Variables.
+
+Para el email del formulario se usa Resend desde la API route `/api/send-request-email`.
 
 ## Supabase
 
