@@ -29,6 +29,14 @@ PUBLIC_ADMIN_EMAIL=admin@musicallyivan.local
 
 En Vercel hay que añadir esas mismas variables en Project Settings > Environment Variables.
 
+## Supabase
+
+1. Abre Supabase > SQL Editor.
+2. Pega y ejecuta el contenido de `supabase/schema.sql`.
+3. En Authentication > Providers activa Email.
+4. Para Twitch, crea la app OAuth en Twitch y activa Twitch en Supabase Auth Providers.
+5. En Authentication > URL Configuration añade tu URL de Vercel como Site URL y Redirect URL.
+
 ## Despliegue en Vercel
 
 1. Sube este repositorio a GitHub.

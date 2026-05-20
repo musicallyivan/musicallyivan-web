@@ -51,6 +51,8 @@ import { SITE_TITLE } from '../consts';
 		</main>
 		<Footer />
 		<script>
+			import { supabase } from '../lib/supabaseClient';
+
 			const form = document.querySelector('#community-form');
 			const feed = document.querySelector('#community-feed');
 			const status = document.querySelector('#community-status');
@@ -82,7 +84,7 @@ import { SITE_TITLE } from '../consts';
 				}
 			};
 
-			const getPosts = () => {
+			const getLocalPosts = () => {
 				const saved = JSON.parse(localStorage.getItem('musicallyivan:community') ?? '[]');
 				return [...saved, ...defaultPosts];
 			};
@@ -114,9 +116,28 @@ import { SITE_TITLE } from '../consts';
 				}
 			};
 
-			const renderPosts = () => {
+			const fetchPosts = async () => {
+				if (!supabase) return getLocalPosts();
+				const { data, error } = await supabase
+					.from('community_posts')
+					.select('id, author_name, provider, message, created_at')
+					.eq('is_hidden', false)
+					.order('created_at', { ascending: false })
+					.limit(50);
+				if (error) return getLocalPosts();
+				return data.map((post) => ({
+					id: post.id,
+					author: post.author_name,
+					provider: post.provider,
+					message: post.message,
+					createdAt: post.created_at,
+				}));
+			};
+
+			const renderPosts = async () => {
 				if (!feed) return;
-				feed.innerHTML = getPosts()
+				const posts = await fetchPosts();
+				feed.innerHTML = posts
 					.map(
 						(post) => `
 							<article class="community-post">
@@ -132,7 +153,7 @@ import { SITE_TITLE } from '../consts';
 					.join('');
 			};
 
-			form?.addEventListener('submit', (event) => {
+			form?.addEventListener('submit', async (event) => {
 				event.preventDefault();
 				const data = new FormData(form);
 				const anonymous = data.get('anonymous') === 'on';
@@ -144,22 +165,36 @@ import { SITE_TITLE } from '../consts';
 				}
 				const message = String(data.get('message') ?? '').trim();
 				if (!message) return;
-				savePost({
+				const post = {
 					id: crypto.randomUUID(),
 					author: anonymous ? 'Anonimo' : user.name,
 					provider: anonymous ? 'anon' : user.provider,
 					message,
 					createdAt: new Date().toISOString(),
-				});
+				};
+
+				if (supabase) {
+					const { data: authData } = await supabase.auth.getUser();
+					const { error } = await supabase.from('community_posts').insert({
+						user_id: anonymous ? null : authData.user?.id,
+						author_name: post.author,
+						provider: post.provider,
+						message,
+						is_anonymous: anonymous,
+					});
+					if (error) savePost(post);
+				} else {
+					savePost(post);
+				}
 				form.reset();
 				form.querySelector('[name="anonymous"]').checked = true;
 				status.textContent = 'Publicacion enviada.';
-				renderPosts();
+				await renderPosts();
 			});
 
 			window.addEventListener('storage', updateAccountStatus);
 			updateAccountStatus();
-			renderPosts();
+			await renderPosts();
 		</script>
 	</body>
 </html>

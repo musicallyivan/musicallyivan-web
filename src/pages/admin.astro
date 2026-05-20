@@ -46,7 +46,10 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 			</section>
 		</main>
 		<Footer />
-		<script define:vars={{ adminEmail }}>
+		<script>
+			import { supabase } from '../lib/supabaseClient';
+
+			const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.local';
 			const adminPanel = document.querySelector('#admin-panel');
 			const lockedPanel = document.querySelector('#locked-panel');
 			const adminStatus = document.querySelector('#admin-status');
@@ -96,8 +99,30 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 				return element;
 			};
 
-			const renderRequests = () => {
-				const requests = readJson('musicallyivan:requests');
+			let remoteRequests = [];
+			let remoteCommunity = [];
+
+			const fetchRequests = async () => {
+				if (!supabase) return readJson('musicallyivan:requests');
+				const { data, error } = await supabase
+					.from('tiktok_requests')
+					.select('id, name, email, message, done, created_at')
+					.order('created_at', { ascending: false });
+				if (error) return readJson('musicallyivan:requests');
+				remoteRequests = data;
+				return data.map((request) => ({
+					id: request.id,
+					name: request.name,
+					email: request.email,
+					message: request.message,
+					done: request.done,
+					createdAt: request.created_at,
+					remote: true,
+				}));
+			};
+
+			const renderRequests = async () => {
+				const requests = await fetchRequests();
 				requestsList.innerHTML = '';
 				if (requests.length === 0) {
 					requestsList.append(createText('p', 'Todavia no hay peticiones guardadas en este navegador.', 'empty'));
@@ -114,11 +139,15 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 					const checkbox = document.createElement('input');
 					checkbox.type = 'checkbox';
 					checkbox.checked = Boolean(request.done);
-					checkbox.addEventListener('change', () => {
-						const nextRequests = readJson('musicallyivan:requests');
-						nextRequests[index] = { ...nextRequests[index], done: checkbox.checked };
-						localStorage.setItem('musicallyivan:requests', JSON.stringify(nextRequests));
-						renderRequests();
+					checkbox.addEventListener('change', async () => {
+						if (request.remote && supabase) {
+							await supabase.from('tiktok_requests').update({ done: checkbox.checked }).eq('id', request.id);
+						} else {
+							const nextRequests = readJson('musicallyivan:requests');
+							nextRequests[index] = { ...nextRequests[index], done: checkbox.checked };
+							localStorage.setItem('musicallyivan:requests', JSON.stringify(nextRequests));
+						}
+						await renderRequests();
 					});
 					checkboxLabel.append(checkbox, document.createTextNode(' Hecho'));
 					top.append(createText('strong', request.name || 'Sin nombre'), checkboxLabel);
@@ -134,8 +163,27 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 				});
 			};
 
-			const renderCommunity = () => {
-				const posts = readJson('musicallyivan:community');
+			const fetchCommunity = async () => {
+				if (!supabase) return readJson('musicallyivan:community');
+				const { data, error } = await supabase
+					.from('community_posts')
+					.select('id, author_name, provider, message, created_at, is_hidden')
+					.order('created_at', { ascending: false });
+				if (error) return readJson('musicallyivan:community');
+				remoteCommunity = data;
+				return data.map((post) => ({
+					id: post.id,
+					author: post.author_name,
+					provider: post.provider,
+					message: post.message,
+					createdAt: post.created_at,
+					hidden: post.is_hidden,
+					remote: true,
+				}));
+			};
+
+			const renderCommunity = async () => {
+				const posts = await fetchCommunity();
 				communityList.innerHTML = '';
 				if (posts.length === 0) {
 					communityList.append(createText('p', 'No hay publicaciones locales de la comunidad.', 'empty'));
@@ -150,11 +198,15 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 					const deleteButton = document.createElement('button');
 					deleteButton.type = 'button';
 					deleteButton.textContent = 'Eliminar';
-					deleteButton.addEventListener('click', () => {
-						const nextPosts = readJson('musicallyivan:community');
-						nextPosts.splice(index, 1);
-						localStorage.setItem('musicallyivan:community', JSON.stringify(nextPosts));
-						renderCommunity();
+					deleteButton.addEventListener('click', async () => {
+						if (post.remote && supabase) {
+							await supabase.from('community_posts').update({ is_hidden: true }).eq('id', post.id);
+						} else {
+							const nextPosts = readJson('musicallyivan:community');
+							nextPosts.splice(index, 1);
+							localStorage.setItem('musicallyivan:community', JSON.stringify(nextPosts));
+						}
+						await renderCommunity();
 					});
 					top.append(createText('strong', post.author || 'Anonimo'), deleteButton);
 					item.append(
@@ -167,7 +219,7 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 				});
 			};
 
-			const renderAdmin = () => {
+			const renderAdmin = async () => {
 				if (!isAdmin()) {
 					adminPanel.hidden = true;
 					lockedPanel.hidden = false;
@@ -178,24 +230,32 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 				adminPanel.hidden = false;
 				lockedPanel.hidden = true;
 				adminStatus.textContent = 'Perfil admin activo. Estos datos son locales hasta conectar backend.';
-				renderRequests();
-				renderCommunity();
+				await renderRequests();
+				await renderCommunity();
 			};
 
-			clearDone?.addEventListener('click', () => {
-				const pending = readJson('musicallyivan:requests').filter((request) => !request.done);
-				localStorage.setItem('musicallyivan:requests', JSON.stringify(pending));
-				renderRequests();
+			clearDone?.addEventListener('click', async () => {
+				if (supabase && remoteRequests.length > 0) {
+					await Promise.all(remoteRequests.filter((request) => request.done).map((request) => supabase.from('tiktok_requests').delete().eq('id', request.id)));
+				} else {
+					const pending = readJson('musicallyivan:requests').filter((request) => !request.done);
+					localStorage.setItem('musicallyivan:requests', JSON.stringify(pending));
+				}
+				await renderRequests();
 			});
 
-			clearCommunity?.addEventListener('click', () => {
-				localStorage.removeItem('musicallyivan:community');
-				renderCommunity();
+			clearCommunity?.addEventListener('click', async () => {
+				if (supabase && remoteCommunity.length > 0) {
+					await Promise.all(remoteCommunity.map((post) => supabase.from('community_posts').update({ is_hidden: true }).eq('id', post.id)));
+				} else {
+					localStorage.removeItem('musicallyivan:community');
+				}
+				await renderCommunity();
 			});
 
 			window.addEventListener('storage', renderAdmin);
 			document.addEventListener('visibilitychange', renderAdmin);
-			renderAdmin();
+			await renderAdmin();
 		</script>
 	</body>
 </html>

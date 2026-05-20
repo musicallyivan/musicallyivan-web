@@ -44,7 +44,10 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 	</div>
 </header>
 
-<script define:vars={{ adminEmail }}>
+<script>
+	import { supabase } from '../lib/supabaseClient';
+
+	const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.local';
 	const loginModal = document.querySelector('#login-modal');
 	const loginForm = document.querySelector('#login-form');
 	const loginStatus = document.querySelector('#login-status');
@@ -69,6 +72,37 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 		});
 	};
 
+	const syncSupabaseUser = async () => {
+		if (!supabase) return;
+		const { data } = await supabase.auth.getUser();
+		const authUser = data.user;
+		if (!authUser) {
+			setLoginLabel();
+			return;
+		}
+
+		const email = authUser.email ?? '';
+		const name =
+			authUser.user_metadata?.display_name ||
+			authUser.user_metadata?.full_name ||
+			authUser.user_metadata?.name ||
+			email.split('@')[0] ||
+			'Usuario';
+		const provider = authUser.app_metadata?.provider ?? 'email';
+		const role = email.toLowerCase() === adminEmail.toLowerCase() ? 'admin' : 'user';
+		const localUser = { id: authUser.id, name, email, provider, role };
+		localStorage.setItem('musicallyivan:user', JSON.stringify(localUser));
+
+		await supabase.from('profiles').upsert({
+			id: authUser.id,
+			display_name: name,
+			provider,
+			role,
+		});
+
+		setLoginLabel();
+	};
+
 	loginButtons.forEach((button) => {
 		button.addEventListener('click', () => {
 			loginModal?.setAttribute('aria-hidden', 'false');
@@ -85,29 +119,60 @@ const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL ?? 'admin@musicallyivan.lo
 		if (event.target === loginModal) loginModal.setAttribute('aria-hidden', 'true');
 	});
 
-	loginForm?.addEventListener('submit', (event) => {
+	loginForm?.addEventListener('submit', async (event) => {
 		event.preventDefault();
 		const formData = new FormData(loginForm);
 		const name = String(formData.get('name') ?? '').trim();
 		const email = String(formData.get('email') ?? '');
+		const password = String(formData.get('password') ?? '');
 		const role = email.toLowerCase() === adminEmail.toLowerCase() ? 'admin' : 'user';
-		localStorage.setItem('musicallyivan:user', JSON.stringify({ name, email, provider: 'normal', role }));
+
+		if (!supabase) {
+			localStorage.setItem('musicallyivan:user', JSON.stringify({ name, email, provider: 'normal', role }));
+			if (loginStatus) loginStatus.textContent = `Sesion iniciada como ${name}.`;
+			setLoginLabel();
+			return;
+		}
+
+		let result = await supabase.auth.signInWithPassword({ email, password });
+		if (result.error) {
+			result = await supabase.auth.signUp({
+				email,
+				password,
+				options: { data: { display_name: name } },
+			});
+		}
+
+		if (result.error) {
+			if (loginStatus) loginStatus.textContent = result.error.message;
+			return;
+		}
+
+		await syncSupabaseUser();
 		if (loginStatus) loginStatus.textContent = `Sesion iniciada como ${name}.`;
-		setLoginLabel();
 	});
 
-	twitchButton?.addEventListener('click', () => {
-		const twitchName = prompt('Usuario de Twitch');
-		if (!twitchName) return;
-		localStorage.setItem(
-			'musicallyivan:user',
-			JSON.stringify({ name: twitchName.trim(), email: '', provider: 'twitch' })
-		);
-		if (loginStatus) loginStatus.textContent = `Sesion iniciada con Twitch como ${twitchName.trim()}.`;
-		setLoginLabel();
+	twitchButton?.addEventListener('click', async () => {
+		if (!supabase) {
+			const twitchName = prompt('Usuario de Twitch');
+			if (!twitchName) return;
+			localStorage.setItem(
+				'musicallyivan:user',
+				JSON.stringify({ name: twitchName.trim(), email: '', provider: 'twitch', role: 'user' })
+			);
+			if (loginStatus) loginStatus.textContent = `Sesion iniciada con Twitch como ${twitchName.trim()}.`;
+			setLoginLabel();
+			return;
+		}
+
+		const { error } = await supabase.auth.signInWithOAuth({
+			provider: 'twitch',
+			options: { redirectTo: window.location.origin },
+		});
+		if (error && loginStatus) loginStatus.textContent = error.message;
 	});
 
-	setLoginLabel();
+	await syncSupabaseUser();
 </script>
 
 <style>

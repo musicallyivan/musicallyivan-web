@@ -54,6 +54,8 @@ const channel = await fetchYoutubeChannel();
 		</main>
 		<Footer />
 		<script>
+			import { supabase } from '../lib/supabaseClient';
+
 			const visitCount = document.querySelector('#visit-count');
 			const followerCount = document.querySelector('#follower-count');
 			const followSite = document.querySelector('#follow-site');
@@ -64,6 +66,22 @@ const channel = await fetchYoutubeChannel();
 			const visits = Number(localStorage.getItem('musicallyivan:visits') ?? '0') + 1;
 			localStorage.setItem('musicallyivan:visits', String(visits));
 			if (visitCount) visitCount.textContent = formatNumber(baseVisits + visits);
+
+			const visitorId =
+				localStorage.getItem('musicallyivan:visitor') ||
+				crypto.randomUUID();
+			localStorage.setItem('musicallyivan:visitor', visitorId);
+
+			const loadRemoteStats = async () => {
+				if (!supabase) return;
+				await supabase.from('site_events').insert({ event_type: 'visit', visitor_id: visitorId });
+				const [{ count: visitsCount }, { count: followsCount }] = await Promise.all([
+					supabase.from('site_events').select('*', { count: 'exact', head: true }).eq('event_type', 'visit'),
+					supabase.from('site_events').select('*', { count: 'exact', head: true }).eq('event_type', 'follow'),
+				]);
+				if (typeof visitsCount === 'number' && visitCount) visitCount.textContent = formatNumber(baseVisits + visitsCount);
+				if (typeof followsCount === 'number' && followerCount) followerCount.textContent = formatNumber(baseFollowers + followsCount);
+			};
 
 			const updateFollowers = () => {
 				const followed = localStorage.getItem('musicallyivan:followed') === 'true';
@@ -77,10 +95,12 @@ const channel = await fetchYoutubeChannel();
 				const localFollowers = Number(localStorage.getItem('musicallyivan:followers') ?? '0') + 1;
 				localStorage.setItem('musicallyivan:followers', String(localFollowers));
 				localStorage.setItem('musicallyivan:followed', 'true');
+				supabase?.from('site_events').insert({ event_type: 'follow', visitor_id: visitorId });
 				updateFollowers();
 			});
 
 			updateFollowers();
+			await loadRemoteStats();
 		</script>
 	</body>
 </html>
